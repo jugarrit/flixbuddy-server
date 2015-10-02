@@ -1,0 +1,6 @@
+{
+  "name": "FlixBuddy Server",
+  "description": "Node.js server for FlixBuddy",
+  "repository": "https://github.com/juliangarritano/FlixBuddy-server",
+  "keywords": ["node", "express", "FlixBuddy"]
+}
