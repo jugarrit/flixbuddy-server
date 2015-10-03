@@ -34,6 +34,7 @@ app.use(bodyParser.urlencoded({
 }));
 
 storage.initSync();
+// storage.clear();
 
 /*
  * Routes
@@ -80,15 +81,24 @@ app.post('/login', function(req, res) {
 });
 
 app.post('/connect', function(req, res) {
-    var appUserA = req.body.appUserA;
-    var appUserB = req.body.appUserB;
+    var appUserIdA = req.body.appUserA;
+    var appUserIdB = req.body.appUserB;
 
-    console.log('appUserA :: ', appUserA);
-    console.log('appUserB :: ', appUserB);
+    if (!storage.getItem(STORAGE_PREFIX_CONNECTION + appUserIdA) && !storage.getItem(STORAGE_PREFIX_CONNECTION + appUserIdB)) {
+        var appUserA = storage.getItem(STORAGE_PREFIX_USER + appUserIdA);
+        var appUserB = storage.getItem(STORAGE_PREFIX_USER + appUserIdB);
 
-    if (!storage.getItem(STORAGE_PREFIX_CONNECTION + appUserA) && !storage.getItem(STORAGE_PREFIX_CONNECTION + appUserB)) {
-        storage.setItem(STORAGE_PREFIX_CONNECTION + appUserA, appUserB);
-        storage.setItem(STORAGE_PREFIX_CONNECTION + appUserB, appUserA);
+        storage.setItem(STORAGE_PREFIX_CONNECTION + appUserIdA, appUserIdB);
+        storage.setItem(STORAGE_PREFIX_CONNECTION + appUserIdB, appUserIdA);
+
+        SupportKit.messages.create(appUserIdA, {
+            text: 'You are now connected with ' + appUserB.firstName + ' ' + appUserB.lastName + '. Any messages you send will be delivered to them.',
+        }, 'appMaker', jwt);
+
+        SupportKit.messages.create(appUserIdB, {
+            text: 'You are now connected with ' + appUserA.firstName + ' ' + appUserA.lastName + '. Any messages you send will be delivered to them.',
+        }, 'appMaker', jwt);
+
         res.status(201).end();
     }
 

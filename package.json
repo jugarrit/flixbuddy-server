@@ -7,6 +7,7 @@
     "grunt": "~0.4.1",
     "node-persist": "0.0.6",
     "node-supportkit": "lemieux/node-supportkit",
+    "q": "^1.4.1",
     "request": "^2.64.0",
     "underscore": "^1.8.3"
   },
