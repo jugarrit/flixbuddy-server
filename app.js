@@ -65,7 +65,8 @@ app.post('/webhook', function(req, res) {
         // Messages
         SupportKit.messages.create(targetUser, {
             text: message,
-            name: userInfo.firstName + ' ' + userInfo.lastName
+            name: userInfo.firstName + ' ' + userInfo.lastName,
+            authorId: 'julian.garritano+flixbuddyuser@gmail.com'
         }, 'appMaker', jwt);
     } else {
         // do nothing!
@@ -109,10 +110,12 @@ app.post('/connect', function(req, res) {
 
         SupportKit.messages.create(appUserIdA, {
             text: 'You are now connected to ' + appUserB.firstName + ' ' + appUserB.lastName + '. Any messages you send will be delivered to them.',
+            authorId: 'julian.garritano+flixbuddy@gmail.com'
         }, 'appMaker', jwt);
 
         SupportKit.messages.create(appUserIdB, {
             text: 'You are now connected to ' + appUserA.firstName + ' ' + appUserA.lastName + '. Any messages you send will be delivered to them.',
+            authorId: 'julian.garritano+flixbuddy@gmail.com'
         }, 'appMaker', jwt);
 
         res.status(201).end();
@@ -140,10 +143,12 @@ app.post('/disconnect', function(req, res) {
 
         SupportKit.messages.create(appUserIdA, {
             text: 'You are no longer connected to ' + appUserB.firstName + ' ' + appUserB.lastName + '.',
+            authorId: 'julian.garritano+flixbuddy@gmail.com'
         }, 'appMaker', jwt);
 
         SupportKit.messages.create(appUserIdB, {
             text: 'You are no longer connected to ' + appUserA.firstName + ' ' + appUserA.lastName + '.',
+            authorId: 'julian.garritano+flixbuddy@gmail.com'
         }, 'appMaker', jwt);
 
         res.status(201).end();
@@ -156,7 +161,7 @@ app.post('/checkIn', function(req, res) {
     var appUserId = req.body.appUserId;
     var appUser = storage.getItem(STORAGE_PREFIX_USER + appUserId);
 
-    if (!appUserId) {
+    if (!appUserId || !appUser) {
         return res.status(400).end();
     }
 
