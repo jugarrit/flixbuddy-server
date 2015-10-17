@@ -5,6 +5,7 @@
     "body-parser": "^1.14.1",
     "express": "~4.0.0",
     "grunt": "~0.4.1",
+    "mongodb": "^2.0.46",
     "node-persist": "0.0.6",
     "node-supportkit": "lemieux/node-supportkit",
     "q": "^1.4.1",
@@ -15,6 +16,7 @@
     "grunt-contrib-watch": "~0.5.2",
     "grunt-express-server": "~0.4.2",
     "load-grunt-tasks": "~0.1.0",
+    "mongoose": "^4.1.11",
     "time-grunt": "~0.1.1"
   },
   "engines": {
