@@ -49,7 +49,7 @@ function createWebhook() {
         });
     });
 
-    SupportKit.webhooks.create('https://api.flixbuddy.co/webhook', jwt);
+    SupportKit.webhooks.create('http://api.flixbuddy.co/webhook', jwt);
 }
 
 initialize();
