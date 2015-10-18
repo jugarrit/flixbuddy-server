@@ -25,10 +25,10 @@ function initialize() {
     app.use(bodyParser.urlencoded({
         extended: true
     }));
-    app.use(require('./src/api'));
+    app.use(require('./routes/flixbuddy-api'));
 
     // Connect to Mongo
-    mongoose.connect(mongolabUri || 'mongodb://localhost/flixbuddy-test');
+    mongoose.connect(mongolabUri || 'mongodb://localhost/flixbuddy-dev');
 
     db.once('open', function() {
         // Start the server
@@ -49,7 +49,9 @@ function createWebhook() {
         });
     });
 
-    SupportKit.webhooks.create('http://api.flixbuddy.co/webhook', jwt);
+    SupportKit.webhooks.create('http://api.flixbuddy.co/webhook', jwt, {
+        events: ['message:appUser']
+    });
 }
 
 initialize();
