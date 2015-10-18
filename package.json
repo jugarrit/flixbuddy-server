@@ -7,9 +7,9 @@
     "grunt": "~0.4.1",
     "mongodb": "^2.0.46",
     "mongoose": "^4.1.11",
-    "node-supportkit": "lemieux/node-supportkit",
     "q": "^1.4.1",
     "request": "^2.64.0",
+    "supportkit-node": "lemieux/supportkit-node",
     "underscore": "^1.8.3"
   },
   "devDependencies": {
