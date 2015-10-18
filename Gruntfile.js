@@ -9,7 +9,7 @@ module.exports = function(grunt) {
     grunt.initConfig({
         // Watch Config
         watch: {
-            files: ['app.js', '!**/node_modules/**', '!Gruntfile.js'],
+            files: ['app.js', '!**/node_modules/**', '!Gruntfile.js', './src/**'],
             options: {
                 livereload: {
                     port: 9999

@@ -4,7 +4,6 @@
 var SupportKit = require('node-supportkit');
 var express = require('express');
 var bodyParser = require('body-parser');
-var storage = require('node-persist');
 var _ = require('underscore');
 var mongoose = require('mongoose');
 
@@ -13,7 +12,6 @@ var port = process.env.PORT || 3000;
 var secret = process.env.SK_SECRET;
 var kid = process.env.SK_KID;
 var mongolabUri = process.env.MONGOLAB_URI;
-
 
 var app = express();
 var db = mongoose.connection;
@@ -29,16 +27,17 @@ function initialize() {
     }));
     app.use(require('./src/api'));
 
+    // Connect to Mongo
     mongoose.connect(mongolabUri || 'mongodb://localhost/flixbuddy-test');
-    storage.initSync();
 
-    db.on('error', console.error.bind(console, 'connection error:'));
     db.once('open', function() {
+        // Start the server
         app.listen(process.env.PORT || port);
         console.log('Mongo connection established');
         console.log('Express started on port ' + port);
     });
 
+    db.on('error', console.error.bind(console, 'connection error:'));
 }
 
 function createWebhook() {
@@ -50,7 +49,9 @@ function createWebhook() {
         });
     });
 
-    SupportKit.webhooks.create('http://bb2e00dd.ngrok.io/webhook', jwt);
+    SupportKit.webhooks.create('https://api.flixbuddy.co/webhook', jwt, {
+        events: ['message:appUser']
+    });
 }
 
 initialize();

@@ -2,13 +2,9 @@
 
 var SupportKit = require('node-supportkit');
 var express = require('express');
-var storage = require('node-persist');
-var _ = require('underscore');
 var mongoose = require('mongoose');
-var db = mongoose.connection;
+var Q = require('q');
 
-var STORAGE_PREFIX_USER = 'user.';
-var STORAGE_PREFIX_CONNECTION = 'connection.';
 var secret = process.env.SK_SECRET;
 var kid = process.env.SK_KID;
 
@@ -18,24 +14,17 @@ var jwt = SupportKit.jwt.generate({
 
 // Mongoose
 var AppUserSchema = require('../models/appUserSchema');
-var ConnectionSchema = require('../models/connectionSchema');
 var AppUser = mongoose.model('AppUser', AppUserSchema);
-var Connection = mongoose.model('ConnectionSchema', ConnectionSchema);
 
 module.exports = express.Router()
     .get('/users', function(req, res) {
-        var storageValues = storage.values();
-
-        storageValues = _.reject(storageValues, function(value) {
-            return !value.appUserId;
+        Q.ninvoke(AppUser, 'find').then(function(appUsers) {
+            res.json(appUsers);
         });
-
-        res.json(storageValues);
     })
+
     .post('/webhook', function(req, res) {
         var appUserId = req.body.appUserId;
-        var targetUser = storage.getItem(STORAGE_PREFIX_CONNECTION + appUserId);
-        var userInfo = storage.getItem(STORAGE_PREFIX_USER + appUserId);
         var message = req.body.items[0].text;
         var role = req.body.items[0].role;
 
@@ -43,117 +32,149 @@ module.exports = express.Router()
             return res.status(400).end();
         }
 
-        if (role === 'appUser' && targetUser) {
-            // Messages
-            SupportKit.messages.create(targetUser, {
-                text: message,
-                name: userInfo.firstName + ' ' + userInfo.lastName,
-                authorId: 'julian.garritano+flixbuddyuser@gmail.com'
-            }, 'appMaker', jwt);
-        } else {
-            // do nothing!
+        if (role === 'appMaker') {
+            return res.status(200).end();
         }
 
-        res.status(200).end();
+        Q.ninvoke(AppUser, 'findOne', {
+            appUserId: appUserId
+        }).then(function(appUser) {
+            if (appUser.connectedTo) {
+                Q.ninvoke(AppUser, 'findOne', {
+                    appUserId: appUser.connectedTo
+                }).then(function(targetUser) {
+                    // Messages
+                    SupportKit.messages.create(targetUser.appUserId, {
+                        text: message,
+                        email: appUser.email,
+                        name: appUser.firstName + ' ' + appUser.lastName
+                    }, 'appMaker', jwt);
+                }
+                );
+            }
+        });
     })
+
     .post('/login', function(req, res) {
+        var appUserId = req.body.appUserId;
+        var appUser;
+
+        if (!appUserId) {
+            return res.status(400).end();
+        }
+
+        appUser = new AppUser({
+            firstName: req.body.firstName,
+            lastName: req.body.lastName,
+            email: req.body.email,
+            appUserId: appUserId
+        });
+
+        Q.ninvoke(appUser, 'save').then(function() {
+            res.status(200).end();
+        });
+    })
+
+    .post('/connect', function(req, res) {
+        var appUserIdA = req.body.appUserA;
+        var appUserIdB = req.body.appUserB;
+
+        Q.all([
+            Q.ninvoke(AppUser, 'findOne', {
+                appUserId: appUserIdA
+            }),
+            Q.ninvoke(AppUser, 'findOne', {
+                appUserId: appUserIdB
+            })
+        ]).spread(function(appUserA, appUserB) {
+            if (!(appUserA.connectedTo && appUserB.connectedTo)) {
+                appUserA.connectedTo = appUserB.appUserId;
+                appUserB.connectedTo = appUserA.appUserId;
+
+                Q.all([
+                    Q.ninvoke(appUserA, 'save'),
+                    Q.ninvoke(appUserB, 'save'),
+                ]).then(function() {
+                    SupportKit.messages.create(appUserIdA, {
+                        text: 'You are now connected to ' + appUserB.firstName + ' ' + appUserB.lastName + '. Any messages you send will be delivered to them.',
+                        avatarUrl: 'https://media.smooch.io/appicons/5622718d670ab91900f3479e.jpg',
+                        name: 'FlixBuddy'
+                    }, 'appMaker', jwt);
+
+                    SupportKit.messages.create(appUserIdB, {
+                        text: 'You are now connected to ' + appUserA.firstName + ' ' + appUserA.lastName + '. Any messages you send will be delivered to them.',
+                        avatarUrl: 'https://media.smooch.io/appicons/5622718d670ab91900f3479e.jpg',
+                        name: 'FlixBuddy'
+                    }, 'appMaker', jwt);
+
+                    res.status(201).end();
+                });
+            } else {
+                res.status(400).end();
+            }
+        });
+    })
+
+    .post('/disconnect', function(req, res) {
+        var appUserIdA = req.body.appUserA;
+        var appUserIdB = req.body.appUserB;
+
+        Q.all([
+            Q.ninvoke(AppUser, 'findOne', {
+                appUserId: appUserIdA
+            }),
+            Q.ninvoke(AppUser, 'findOne', {
+                appUserId: appUserIdB
+            })
+        ]).spread(function(appUserA, appUserB) {
+            Q.all([
+                Q.ninvoke(appUserA, 'update', {
+                    $unset: {
+                        'connectedTo': 1
+                    }
+                }),
+                Q.ninvoke(appUserB, 'update', {
+                    $unset: {
+                        'connectedTo': 1
+                    }
+                })
+            ]).then(function() {
+                SupportKit.messages.create(appUserIdA, {
+                    text: 'You are no longer connected to ' + appUserB.firstName + ' ' + appUserB.lastName + '.',
+                    avatarUrl: 'https://media.smooch.io/appicons/5622718d670ab91900f3479e.jpg',
+                    name: 'FlixBuddy'
+                }, 'appMaker', jwt);
+
+                SupportKit.messages.create(appUserIdB, {
+                    text: 'You are no longer connected to ' + appUserA.firstName + ' ' + appUserA.lastName + '.',
+                    avatarUrl: 'https://media.smooch.io/appicons/5622718d670ab91900f3479e.jpg',
+                    name: 'FlixBuddy'
+                }, 'appMaker', jwt);
+
+                res.status(200).end();
+            });
+        });
+    })
+
+    .post('/checkIn', function(req, res) {
         var appUserId = req.body.appUserId;
 
         if (!appUserId) {
             return res.status(400).end();
         }
 
-        storage.setItem(STORAGE_PREFIX_USER + appUserId, {
-            firstName: req.body.firstName,
-            lastName: req.body.lastName,
-            email: req.body.email,
+        Q.ninvoke(AppUser, 'findOne', {
             appUserId: appUserId
-        }).then(function() {
-            res.status(200).end();
+        }).then(function(appUser) {
+            appUser.checkinData = {
+                flickTitle: req.body.flickTitle,
+                remaining: req.body.remaining,
+                lastSeen: Date.now()
+            };
+            Q.ninvoke(appUser, 'save').then(function() {
+                res.status(200).end();
+            });
+        }).fail(function() {
+            res.status(404).end();
         });
-    })
-    .post('/connect', function(req, res) {
-        var appUserIdA = req.body.appUserA;
-        var appUserIdB = req.body.appUserB;
-
-        if (!storage.getItem(STORAGE_PREFIX_CONNECTION + appUserIdA) && !storage.getItem(STORAGE_PREFIX_CONNECTION + appUserIdB)) {
-            var appUserA = storage.getItem(STORAGE_PREFIX_USER + appUserIdA);
-            var appUserB = storage.getItem(STORAGE_PREFIX_USER + appUserIdB);
-
-            storage.setItem(STORAGE_PREFIX_CONNECTION + appUserIdA, appUserIdB);
-            storage.setItem(STORAGE_PREFIX_CONNECTION + appUserIdB, appUserIdA);
-
-            appUserA.connectedTo = appUserIdB;
-            appUserB.connectedTo = appUserIdA;
-            storage.setItem(STORAGE_PREFIX_USER + appUserIdA, appUserA);
-            storage.setItem(STORAGE_PREFIX_USER + appUserIdB, appUserB);
-
-            SupportKit.messages.create(appUserIdA, {
-                text: 'You are now connected to ' + appUserB.firstName + ' ' + appUserB.lastName + '. Any messages you send will be delivered to them.',
-                avatarUrl: 'https://media.smooch.io/appicons/5622718d670ab91900f3479e.jpg',
-                name: 'FlixBuddy'
-            }, 'appMaker', jwt);
-
-            SupportKit.messages.create(appUserIdB, {
-                text: 'You are now connected to ' + appUserA.firstName + ' ' + appUserA.lastName + '. Any messages you send will be delivered to them.',
-                avatarUrl: 'https://media.smooch.io/appicons/5622718d670ab91900f3479e.jpg',
-                name: 'FlixBuddy'
-            }, 'appMaker', jwt);
-
-            res.status(201).end();
-        }
-
-        res.status(400).end();
-    })
-    .post('/disconnect', function(req, res) {
-        var appUserIdA = req.body.appUserA;
-        var appUserIdB = req.body.appUserB;
-
-        if (storage.getItem(STORAGE_PREFIX_CONNECTION + appUserIdA) && storage.getItem(STORAGE_PREFIX_CONNECTION + appUserIdB)) {
-            var appUserA = storage.getItem(STORAGE_PREFIX_USER + appUserIdA);
-            var appUserB = storage.getItem(STORAGE_PREFIX_USER + appUserIdB);
-
-            storage.removeItem(STORAGE_PREFIX_CONNECTION + appUserIdA);
-            storage.removeItem(STORAGE_PREFIX_CONNECTION + appUserIdB);
-
-            delete appUserA.connectedTo;
-            delete appUserB.connectedTo;
-
-            storage.setItem(STORAGE_PREFIX_USER + appUserIdA, appUserA);
-            storage.setItem(STORAGE_PREFIX_USER + appUserIdB, appUserB);
-
-            SupportKit.messages.create(appUserIdA, {
-                text: 'You are no longer connected to ' + appUserB.firstName + ' ' + appUserB.lastName + '.',
-                avatarUrl: 'https://media.smooch.io/appicons/5622718d670ab91900f3479e.jpg',
-                name: 'FlixBuddy'
-            }, 'appMaker', jwt);
-
-            SupportKit.messages.create(appUserIdB, {
-                text: 'You are no longer connected to ' + appUserA.firstName + ' ' + appUserA.lastName + '.',
-                avatarUrl: 'https://media.smooch.io/appicons/5622718d670ab91900f3479e.jpg',
-                name: 'FlixBuddy'
-            }, 'appMaker', jwt);
-
-            res.status(201).end();
-        }
-
-        res.status(400).end();
-    })
-    .post('/checkIn', function(req, res) {
-        var appUserId = req.body.appUserId;
-        var appUser = storage.getItem(STORAGE_PREFIX_USER + appUserId);
-
-        if (!appUserId || !appUser) {
-            return res.status(400).end();
-        }
-
-        appUser.checkinData = {
-            flickTitle: req.body.flickTitle,
-            remaining: req.body.remaining,
-            lastSeen: Date.now()
-        };
-
-        storage.setItem(STORAGE_PREFIX_USER + appUserId, appUser);
-
-        res.status(200).end();
     });
