@@ -1,7 +1,7 @@
 'use strict';
 
 // Libs
-var SupportKit = require('node-supportkit');
+var SupportKit = require('supportkit-node');
 var express = require('express');
 var bodyParser = require('body-parser');
 var _ = require('underscore');

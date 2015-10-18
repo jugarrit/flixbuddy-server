@@ -1,6 +1,6 @@
 'use strict';
 
-var SupportKit = require('node-supportkit');
+var SupportKit = require('supportkit-node');
 var express = require('express');
 var mongoose = require('mongoose');
 var Q = require('q');
